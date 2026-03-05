@@ -1,0 +1,333 @@
+<?php
+/**
+ * TAB: Journal des Publications Facebook
+ * Historique par Persona avec filtres
+ */
+
+$filterPersona = $_GET['persona'] ?? '';
+$filterType = $_GET['type'] ?? '';
+$filterStatus = $_GET['status'] ?? '';
+
+// Construction de la requête
+$sql = "SELECT fp.*, np.name as persona_name, np.type as persona_type 
+        FROM facebook_posts fp 
+        LEFT JOIN neuropersonas np ON fp.persona_id = np.id 
+        WHERE 1=1";
+$params = [];
+
+if ($filterPersona) {
+    $sql .= " AND fp.persona_id = ?";
+    $params[] = $filterPersona;
+}
+if ($filterType) {
+    $sql .= " AND fp.post_type = ?";
+    $params[] = $filterType;
+}
+if ($filterStatus) {
+    $sql .= " AND fp.status = ?";
+    $params[] = $filterStatus;
+}
+
+$sql .= " ORDER BY fp.scheduled_date DESC, fp.created_at DESC";
+
+$posts = [];
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $posts = $stmt->fetchAll();
+} catch (Exception $e) {}
+
+// Stats par persona
+$statsByPersona = [];
+try {
+    $stmt = $pdo->query("
+        SELECT np.id, np.name, np.type, COUNT(fp.id) as post_count, 
+               SUM(CASE WHEN fp.status = 'published' THEN 1 ELSE 0 END) as published_count
+        FROM neuropersonas np
+        LEFT JOIN facebook_posts fp ON np.id = fp.persona_id
+        WHERE np.is_active = 1
+        GROUP BY np.id
+        ORDER BY np.type, np.name
+    ");
+    $statsByPersona = $stmt->fetchAll();
+} catch (Exception $e) {}
+?>
+
+<!-- Stats par Persona -->
+<div style="margin-bottom: 24px;">
+    <h4 style="font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 12px;">
+        <i class="fas fa-chart-bar"></i> Publications par Persona
+    </h4>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <?php if (empty($statsByPersona)): ?>
+        <div style="color: #64748b; font-size: 13px;">
+            <i class="fas fa-info-circle"></i> Aucun persona configuré. 
+            <a href="?page=neuropersona" style="color: #1877f2;">Créez vos personas</a>
+        </div>
+        <?php else: ?>
+        <?php foreach ($statsByPersona as $ps): ?>
+        <a href="?page=facebook&tab=journal&persona=<?php echo $ps['id']; ?>" 
+           class="persona-stat-card <?php echo $filterPersona == $ps['id'] ? 'active' : ''; ?>"
+           style="<?php echo $ps['type'] === 'acheteur' ? 'border-color: #3b82f6;' : 'border-color: #ec4899;'; ?>">
+            <span class="persona-badge <?php echo $ps['type']; ?>">
+                <?php echo $ps['type'] === 'acheteur' ? '🏠' : '🔑'; ?>
+                <?php echo htmlspecialchars($ps['name']); ?>
+            </span>
+            <div class="persona-stats">
+                <span><strong><?php echo $ps['post_count'] ?: 0; ?></strong> posts</span>
+                <span style="color: #10b981;"><i class="fas fa-check"></i> <?php echo $ps['published_count'] ?: 0; ?></span>
+            </div>
+        </a>
+        <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="?page=facebook&tab=journal" class="btn btn-sm <?php echo !$filterPersona && !$filterType && !$filterStatus ? 'btn-fb' : 'btn-secondary'; ?>">
+            Tout
+        </a>
+        <div style="display: flex; gap: 4px;">
+            <a href="?page=facebook&tab=journal&type=attirer<?php echo $filterPersona ? '&persona='.$filterPersona : ''; ?>" 
+               class="btn btn-sm <?php echo $filterType === 'attirer' ? '' : 'btn-secondary'; ?>"
+               style="<?php echo $filterType === 'attirer' ? 'background: #10b981; color: white;' : ''; ?>">
+                <i class="fas fa-magnet"></i> Attirer
+            </a>
+            <a href="?page=facebook&tab=journal&type=connecter<?php echo $filterPersona ? '&persona='.$filterPersona : ''; ?>" 
+               class="btn btn-sm <?php echo $filterType === 'connecter' ? '' : 'btn-secondary'; ?>"
+               style="<?php echo $filterType === 'connecter' ? 'background: #f59e0b; color: white;' : ''; ?>">
+                <i class="fas fa-heart"></i> Connecter
+            </a>
+            <a href="?page=facebook&tab=journal&type=convertir<?php echo $filterPersona ? '&persona='.$filterPersona : ''; ?>" 
+               class="btn btn-sm <?php echo $filterType === 'convertir' ? '' : 'btn-secondary'; ?>"
+               style="<?php echo $filterType === 'convertir' ? 'background: #8b5cf6; color: white;' : ''; ?>">
+                <i class="fas fa-bullseye"></i> Convertir
+            </a>
+        </div>
+        <div style="display: flex; gap: 4px;">
+            <a href="?page=facebook&tab=journal&status=planned<?php echo $filterPersona ? '&persona='.$filterPersona : ''; ?>" 
+               class="btn btn-sm <?php echo $filterStatus === 'planned' ? 'btn-fb' : 'btn-secondary'; ?>">
+                <i class="fas fa-clock"></i> Planifiés
+            </a>
+            <a href="?page=facebook&tab=journal&status=published<?php echo $filterPersona ? '&persona='.$filterPersona : ''; ?>" 
+               class="btn btn-sm <?php echo $filterStatus === 'published' ? 'btn-success' : 'btn-secondary'; ?>">
+                <i class="fas fa-check"></i> Publiés
+            </a>
+        </div>
+    </div>
+    <a href="?page=facebook&tab=rediger" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Nouvelle publication
+    </a>
+</div>
+
+<?php if (empty($posts)): ?>
+<div class="content-card">
+    <div class="card-body" style="text-align: center; padding: 60px;">
+        <i class="fab fa-facebook" style="font-size: 48px; color: #e2e8f0; margin-bottom: 16px;"></i>
+        <h3 style="color: #1e293b; margin-bottom: 8px;">Aucune publication pour le moment</h3>
+        <p style="color: #64748b; margin-bottom: 20px;">
+            <?php if ($filterPersona || $filterType || $filterStatus): ?>
+            Aucun résultat avec ces filtres. <a href="?page=facebook&tab=journal">Voir tout</a>
+            <?php else: ?>
+            Commencez par rédiger votre première publication Facebook
+            <?php endif; ?>
+        </p>
+        <a href="?page=facebook&tab=rediger" class="btn btn-fb">
+            <i class="fas fa-pen"></i> Rédiger mon premier post
+        </a>
+    </div>
+</div>
+<?php else: ?>
+
+<div class="content-card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 100px;">Date</th>
+                <th style="width: 140px;">Persona</th>
+                <th style="width: 100px;">Type</th>
+                <th>Accroche</th>
+                <th style="width: 90px;">Statut</th>
+                <th style="width: 120px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($posts as $post): ?>
+            <tr>
+                <td>
+                    <div style="font-weight: 500;"><?php echo date('d/m/Y', strtotime($post['scheduled_date'])); ?></div>
+                    <div style="font-size: 11px; color: #64748b;">
+                        <?php 
+                        $daysAgo = (strtotime('today') - strtotime($post['scheduled_date'])) / 86400;
+                        if ($daysAgo == 0) echo "Aujourd'hui";
+                        elseif ($daysAgo == 1) echo "Hier";
+                        elseif ($daysAgo == -1) echo "Demain";
+                        elseif ($daysAgo > 0) echo "Il y a " . floor($daysAgo) . "j";
+                        else echo "Dans " . abs(floor($daysAgo)) . "j";
+                        ?>
+                    </div>
+                </td>
+                <td>
+                    <?php if ($post['persona_name']): ?>
+                    <span class="persona-badge <?php echo $post['persona_type']; ?>">
+                        <?php echo $post['persona_type'] === 'acheteur' ? '🏠' : '🔑'; ?>
+                        <?php echo htmlspecialchars($post['persona_name']); ?>
+                    </span>
+                    <?php else: ?>
+                    <span style="color: #94a3b8; font-size: 12px;">Non défini</span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <span class="post-type-badge <?php echo $post['post_type']; ?>">
+                        <?php 
+                        $icons = ['attirer' => 'magnet', 'connecter' => 'heart', 'convertir' => 'bullseye'];
+                        $labels = ['attirer' => 'Attirer', 'connecter' => 'Connecter', 'convertir' => 'Convertir'];
+                        ?>
+                        <i class="fas fa-<?php echo $icons[$post['post_type']] ?? 'circle'; ?>"></i>
+                        <?php echo $labels[$post['post_type']] ?? $post['post_type']; ?>
+                    </span>
+                </td>
+                <td>
+                    <div style="font-weight: 500; margin-bottom: 4px;">
+                        <?php echo htmlspecialchars(substr($post['motivation'], 0, 60)); ?>...
+                    </div>
+                    <?php if (!empty($post['image_suggestion'])): ?>
+                    <div style="font-size: 11px; color: #64748b;">
+                        <i class="fas fa-image"></i> Image prévue
+                    </div>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <span class="status-badge <?php echo $post['status']; ?>">
+                        <?php 
+                        $statusLabels = ['draft' => 'Brouillon', 'planned' => 'Planifié', 'published' => 'Publié'];
+                        echo $statusLabels[$post['status']] ?? $post['status'];
+                        ?>
+                    </span>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-icon btn-secondary btn-sm" onclick="previewPost(<?php echo $post['id']; ?>)" title="Voir">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <a href="?page=facebook&tab=rediger&id=<?php echo $post['id']; ?>" class="btn btn-icon btn-secondary btn-sm" title="Modifier">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button class="btn btn-icon btn-secondary btn-sm" onclick="copyPost(<?php echo $post['id']; ?>)" title="Copier le texte">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <?php if ($post['status'] !== 'published'): ?>
+                        <button class="btn btn-icon btn-sm" style="background: #dcfce7; color: #16a34a;" onclick="markPublished(<?php echo $post['id']; ?>)" title="Marquer publié">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Preview -->
+<div id="previewModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 16px; width: 100%; max-width: 550px; max-height: 90vh; overflow: auto;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 15px;">
+                <i class="fab fa-facebook" style="color: #1877f2;"></i> Prévisualisation
+            </h3>
+            <button onclick="closePreview()" style="background: none; border: none; cursor: pointer; font-size: 20px; color: #64748b;">×</button>
+        </div>
+        <div style="padding: 20px;">
+            <!-- Simulation post Facebook -->
+            <div style="border: 1px solid #dddfe2; border-radius: 8px; padding: 16px; background: white;">
+                <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 50%;"></div>
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">Votre Nom</div>
+                        <div style="font-size: 12px; color: #65676b;">Maintenant · <i class="fas fa-globe-europe"></i></div>
+                    </div>
+                </div>
+                <div id="modalContent" style="font-size: 14px; line-height: 1.5; white-space: pre-wrap;"></div>
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #ced0d4; display: flex; justify-content: space-around;">
+                    <span style="color: #65676b; font-size: 13px;"><i class="far fa-thumbs-up"></i> J'aime</span>
+                    <span style="color: #65676b; font-size: 13px;"><i class="far fa-comment"></i> Commenter</span>
+                    <span style="color: #65676b; font-size: 13px;"><i class="far fa-share-square"></i> Partager</span>
+                </div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="copyFromModal()" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-copy"></i> Copier
+                </button>
+                <a href="https://facebook.com" target="_blank" class="btn btn-fb btn-sm">
+                    <i class="fab fa-facebook"></i> Ouvrir Facebook
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Données posts pour JS -->
+<script>
+const postsData = <?php echo json_encode($posts); ?>;
+
+function previewPost(id) {
+    const post = postsData.find(p => p.id == id);
+    if (post) {
+        const fullContent = [post.motivation, '', post.explication, '', post.resultat, '', post.exercice].filter(Boolean).join('\n');
+        document.getElementById('modalContent').textContent = fullContent;
+        document.getElementById('previewModal').style.display = 'flex';
+    }
+}
+
+function closePreview() {
+    document.getElementById('previewModal').style.display = 'none';
+}
+
+function copyPost(id) {
+    const post = postsData.find(p => p.id == id);
+    if (post) {
+        const fullContent = [post.motivation, '', post.explication, '', post.resultat, '', post.exercice].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(fullContent).then(() => {
+            alert('✅ Post copié ! Collez-le sur Facebook.');
+        });
+    }
+}
+
+function copyFromModal() {
+    const text = document.getElementById('modalContent').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('✅ Post copié !');
+    });
+}
+
+function markPublished(id) {
+    if (confirm('Marquer ce post comme publié ?')) {
+        fetch('api/facebook/update-status.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: id, status: 'published'})
+        }).then(() => location.reload());
+    }
+}
+</script>
+
+<style>
+.persona-stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.persona-stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.persona-stat-card.active { border-width: 2px; background: rgba(24,119,242,0.05); }
+.persona-stat-card .persona-stats { display: flex; gap: 12px; font-size: 12px; color: #64748b; }
+</style>

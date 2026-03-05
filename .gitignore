@@ -1,0 +1,38 @@
+# Logs
+logs/*.log
+
+# Cache
+cache/
+
+# Uploads
+uploads/
+
+# Temp
+tmp/
+
+# Environment
+.env
+
+# Config sensible (credentials DB, API keys)
+config/config.php
+config/constants.php
+config/license.json
+
+# Claude Code
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives
+*.zip
+*.tar.gz
+
+# Vendor
+vendor/
+node_modules/

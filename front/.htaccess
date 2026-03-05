@@ -1,0 +1,104 @@
+# =====================================================
+# .htaccess - Routing complet vers le Builder + Blog + Capture
+# À placer à la RACINE du site (public_html/)
+# =====================================================
+
+# Activer le moteur de réécriture
+RewriteEngine On
+RewriteBase /
+
+# =====================================================
+# SÉCURITÉ - Protéger les fichiers sensibles
+# =====================================================
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "(composer\.(json|lock)|package\.json|\.env|\.gitignore)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Protéger les dossiers sensibles
+RewriteRule ^config/ - [F,L]
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^logs/ - [F,L]
+RewriteRule ^vendor/ - [F,L]
+
+# =====================================================
+# FICHIERS & DOSSIERS EXISTANTS
+# =====================================================
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# =====================================================
+# EXCLUSIONS - Ne pas router vers le Builder
+# =====================================================
+RewriteRule ^admin(/.*)?$ - [L]
+RewriteRule ^api(/.*)?$ - [L]
+RewriteRule ^assets(/.*)?$ - [L]
+RewriteRule ^uploads(/.*)?$ - [L]
+RewriteRule ^front/assets(/.*)?$ - [L]
+
+# =====================================================
+# PAGE D'ACCUEIL
+# =====================================================
+RewriteRule ^$ /front/page.php [L,QSA]
+
+# =====================================================
+# BLOG → BlogRenderer (articles dynamiques DB)
+# =====================================================
+RewriteRule ^blog/?$ /front/pages/blog.php [QSA,L]
+RewriteRule ^blog/([a-z0-9-]+)/?$ /front/pages/blog/index.php?slug=$1 [QSA,L]
+
+# =====================================================
+# PAGES DE CAPTURE → Template capture
+# DOIT être AVANT le catch-all Builder
+# =====================================================
+# /capture/          → Liste ou redirect
+# /capture/mon-slug  → Page de capture dynamique
+RewriteRule ^capture/?$ /front/capture/index.php [QSA,L]
+RewriteRule ^capture/([a-z0-9-]+)/?$ /front/capture/index.php?slug=$1 [QSA,L]
+
+# =====================================================
+# TOUTES LES AUTRES PAGES → BUILDER
+# =====================================================
+RewriteCond %{REQUEST_URI} !^/front/page\.php
+RewriteCond %{REQUEST_URI} !^/front/pages/
+RewriteCond %{REQUEST_URI} !^/front/capture/
+RewriteCond %{REQUEST_URI} !^/(admin|api|config|includes|uploads|assets|logs|vendor)
+RewriteRule ^(.+)$ /front/page.php [L,QSA]
+
+# =====================================================
+# PERFORMANCE & CACHE
+# =====================================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/x-javascript "access plus 1 week"
+    ExpiresByType font/woff2 "access plus 1 month"
+    ExpiresByType font/woff "access plus 1 month"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE application/json application/xml
+</IfModule>
+
+# =====================================================
+# ERREURS PERSONNALISÉES
+# =====================================================
+ErrorDocument 404 /front/404.php
+ErrorDocument 500 /front/500.php

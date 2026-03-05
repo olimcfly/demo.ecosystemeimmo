@@ -1,0 +1,318 @@
+<?php
+/**
+ * TAB: Banque d'Idées de Scripts
+ * ===============================
+ * Scripts prêts à l'emploi classés par niveau de conscience
+ */
+
+// Récupérer les idées
+$ideas = [];
+try {
+    $ideas = $pdo->query("SELECT * FROM tiktok_ideas ORDER BY consciousness_level, persona_type, video_type")->fetchAll();
+} catch (Exception $e) {}
+
+// Filtres
+$filterLevel = $_GET['level'] ?? '';
+$filterPersona = $_GET['persona_type'] ?? '';
+$filterType = $_GET['type'] ?? '';
+
+// Grouper par niveau
+$ideasByLevel = [];
+foreach ($ideas as $idea) {
+    $level = $idea['consciousness_level'];
+    if (!isset($ideasByLevel[$level])) {
+        $ideasByLevel[$level] = [];
+    }
+    $ideasByLevel[$level][] = $idea;
+}
+
+// Niveaux de conscience
+$levels = [
+    1 => ['name' => 'Inconscient', 'color' => '#dc2626', 'bg' => '#fef2f2', 'desc' => 'Ne sait pas qu\'il a un besoin'],
+    2 => ['name' => 'Problème', 'color' => '#ea580c', 'bg' => '#fff7ed', 'desc' => 'Ressent un problème'],
+    3 => ['name' => 'Solution', 'color' => '#ca8a04', 'bg' => '#fefce8', 'desc' => 'Cherche des solutions'],
+    4 => ['name' => 'Produit', 'color' => '#059669', 'bg' => '#ecfdf5', 'desc' => 'Compare les options'],
+    5 => ['name' => 'Très conscient', 'color' => '#2563eb', 'bg' => '#eff6ff', 'desc' => 'Prêt à agir'],
+];
+
+$videoTypes = [
+    'hook' => '💥',
+    'myth' => '🤯',
+    'conseil' => '💡',
+    'story' => '📖',
+    'coulisse' => '🎬',
+    'temoignage' => '⭐',
+];
+?>
+
+<!-- Introduction -->
+<div class="alert alert-info" style="border-left: 4px solid #3b82f6;">
+    <i class="fas fa-lightbulb" style="font-size: 20px;"></i>
+    <div>
+        <strong>Banque d'Idées de Scripts</strong>
+        <p style="margin: 4px 0 0 0; font-size: 13px;">
+            Cliquez sur une idée pour la transformer en script complet. Les idées sont organisées par <strong>niveau de conscience</strong> : 
+            choisissez le niveau qui correspond à l'état d'esprit de votre cible.
+        </p>
+    </div>
+</div>
+
+<!-- Filtres rapides par niveau -->
+<div style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
+    <a href="?page=tiktok&tab=idees" class="level-filter <?php echo !$filterLevel ? 'active' : ''; ?>">
+        Tous
+    </a>
+    <?php foreach ($levels as $num => $level): ?>
+    <a href="?page=tiktok&tab=idees&level=<?php echo $num; ?>" 
+       class="level-filter <?php echo $filterLevel == $num ? 'active' : ''; ?>"
+       style="--level-color: <?php echo $level['color']; ?>; --level-bg: <?php echo $level['bg']; ?>;">
+        N<?php echo $num; ?> - <?php echo $level['name']; ?>
+    </a>
+    <?php endforeach; ?>
+</div>
+
+<!-- Affichage par niveau -->
+<?php foreach ($levels as $levelNum => $levelInfo): 
+    if ($filterLevel && $filterLevel != $levelNum) continue;
+    $levelIdeas = $ideasByLevel[$levelNum] ?? [];
+    if (empty($levelIdeas)) continue;
+?>
+
+<div class="content-card" style="margin-bottom: 24px; border-left: 4px solid <?php echo $levelInfo['color']; ?>;">
+    <div class="card-header" style="background: <?php echo $levelInfo['bg']; ?>;">
+        <h3 style="color: <?php echo $levelInfo['color']; ?>; margin: 0;">
+            <span style="display: inline-flex; width: 32px; height: 32px; background: <?php echo $levelInfo['color']; ?>; color: white; border-radius: 50%; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin-right: 10px;">
+                <?php echo $levelNum; ?>
+            </span>
+            Niveau <?php echo $levelNum; ?> - <?php echo $levelInfo['name']; ?>
+        </h3>
+        <span style="font-size: 12px; color: <?php echo $levelInfo['color']; ?>;">
+            <?php echo $levelInfo['desc']; ?> • <?php echo count($levelIdeas); ?> idées
+        </span>
+    </div>
+    <div class="card-body" style="padding: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+            <?php foreach ($levelIdeas as $idea): ?>
+            <div class="idea-card" onclick="useIdea(<?php echo htmlspecialchars(json_encode($idea)); ?>)">
+                <div class="idea-header">
+                    <span class="idea-type"><?php echo $videoTypes[$idea['video_type']] ?? '📹'; ?></span>
+                    <span class="idea-persona <?php echo $idea['persona_type']; ?>">
+                        <?php echo $idea['persona_type'] === 'acheteur' ? '🏠 Acheteur' : ($idea['persona_type'] === 'vendeur' ? '🔑 Vendeur' : '👥 Tous'); ?>
+                    </span>
+                </div>
+                <h4 class="idea-title"><?php echo htmlspecialchars($idea['title']); ?></h4>
+                <?php if ($idea['hook_suggestion']): ?>
+                <p class="idea-hook">"<?php echo htmlspecialchars(substr($idea['hook_suggestion'], 0, 80)); ?>..."</p>
+                <?php endif; ?>
+                <div class="idea-footer">
+                    <span style="font-size: 11px; color: #64748b;">
+                        <?php echo $idea['used_count']; ?>x utilisé
+                    </span>
+                    <span class="idea-action">Utiliser →</span>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
+<?php endforeach; ?>
+
+<?php if (empty($ideas)): ?>
+<div class="content-card">
+    <div class="card-body" style="text-align: center; padding: 60px;">
+        <div style="font-size: 64px; margin-bottom: 16px;">💡</div>
+        <h3 style="margin: 0 0 8px 0;">Aucune idée dans la banque</h3>
+        <p style="color: #64748b; margin: 0 0 24px 0;">
+            Exécutez le fichier SQL pour importer les idées de scripts pré-remplis.
+        </p>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Modal pour utiliser une idée -->
+<div id="useIdeaModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow: auto;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;"><i class="fas fa-magic" style="color: #8b5cf6;"></i> Utiliser cette idée</h3>
+            <button onclick="closeIdeaModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b;">×</button>
+        </div>
+        <div style="padding: 24px;">
+            <div id="ideaPreview"></div>
+            <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="closeIdeaModal()" class="btn btn-secondary">Annuler</button>
+                <button onclick="createFromIdea()" class="btn btn-tiktok">
+                    <i class="fas fa-pen"></i> Créer le script
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.level-filter {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    background: #f1f5f9;
+    color: #64748b;
+    transition: all 0.2s;
+}
+.level-filter:hover { background: #e2e8f0; }
+.level-filter.active { 
+    background: var(--level-bg, #161823); 
+    color: var(--level-color, white); 
+}
+
+.idea-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.idea-card:hover {
+    border-color: #fe2c55;
+    box-shadow: 0 4px 12px rgba(254,44,85,0.1);
+    transform: translateY(-2px);
+}
+
+.idea-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.idea-type {
+    font-size: 20px;
+}
+
+.idea-persona {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+.idea-persona.acheteur { background: #dbeafe; color: #1e40af; }
+.idea-persona.vendeur { background: #fce7f3; color: #9d174d; }
+.idea-persona.tous { background: #f3e8ff; color: #7c3aed; }
+
+.idea-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #1e293b;
+}
+
+.idea-hook {
+    font-size: 12px;
+    color: #64748b;
+    font-style: italic;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+
+.idea-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.idea-action {
+    font-size: 11px;
+    font-weight: 600;
+    color: #fe2c55;
+}
+</style>
+
+<script>
+let currentIdea = null;
+
+function useIdea(idea) {
+    currentIdea = idea;
+    
+    const levels = {
+        1: {name: 'Inconscient', color: '#dc2626'},
+        2: {name: 'Problème', color: '#ea580c'},
+        3: {name: 'Solution', color: '#ca8a04'},
+        4: {name: 'Produit', color: '#059669'},
+        5: {name: 'Très conscient', color: '#2563eb'}
+    };
+    
+    const level = levels[idea.consciousness_level];
+    
+    document.getElementById('ideaPreview').innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <span style="background: ${level.color}; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;">
+                    Niveau ${idea.consciousness_level} - ${level.name}
+                </span>
+                <span style="background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;">
+                    ${idea.persona_type === 'acheteur' ? '🏠 Acheteur' : (idea.persona_type === 'vendeur' ? '🔑 Vendeur' : '👥 Tous')}
+                </span>
+            </div>
+            <h4 style="font-size: 16px; margin: 0 0 16px 0;">${escapeHtml(idea.title)}</h4>
+        </div>
+        
+        ${idea.hook_suggestion ? `
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">🎣 Hook suggéré</div>
+            <div style="background: #fef2f2; padding: 12px; border-radius: 8px; font-size: 13px;">${escapeHtml(idea.hook_suggestion)}</div>
+        </div>
+        ` : ''}
+        
+        ${idea.body_suggestion ? `
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">📝 Corps suggéré</div>
+            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; font-size: 13px;">${escapeHtml(idea.body_suggestion)}</div>
+        </div>
+        ` : ''}
+        
+        ${idea.cta_suggestion ? `
+        <div>
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">👆 CTA suggéré</div>
+            <div style="background: #ecfdf5; padding: 12px; border-radius: 8px; font-size: 13px;">${escapeHtml(idea.cta_suggestion)}</div>
+        </div>
+        ` : ''}
+    `;
+    
+    document.getElementById('useIdeaModal').style.display = 'flex';
+}
+
+function closeIdeaModal() {
+    document.getElementById('useIdeaModal').style.display = 'none';
+    currentIdea = null;
+}
+
+function createFromIdea() {
+    if (!currentIdea) return;
+    
+    // Rediriger vers la création avec les données pré-remplies
+    const params = new URLSearchParams({
+        page: 'tiktok',
+        tab: 'scripts',
+        from_idea: currentIdea.id,
+        level: currentIdea.consciousness_level,
+        type: currentIdea.video_type,
+        subject: currentIdea.title,
+        hook: currentIdea.hook_suggestion || '',
+        body: currentIdea.body_suggestion || '',
+        cta: currentIdea.cta_suggestion || ''
+    });
+    
+    window.location.href = '?' + params.toString();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>

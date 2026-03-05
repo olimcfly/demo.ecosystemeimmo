@@ -1,0 +1,110 @@
+# =====================================================
+# .htaccess - RACINE public_html/
+# Routing + Securite + Cache
+# =====================================================
+
+RewriteEngine On
+RewriteBase /
+
+# =====================================================
+# SECURITE
+# =====================================================
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "\.(sql|log|bak|old|orig|tmp)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "(composer\.(json|lock)|package\.json|\.env|\.gitignore)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "(diagnostic|routing|fix|test-maintenance|maintenance)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+RewriteRule ^config/ - [F,L]
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^logs/ - [F,L]
+RewriteRule ^cache/ - [F,L]
+RewriteRule ^setup/ - [F,L]
+RewriteRule ^tmp/ - [F,L]
+RewriteRule ^core/ - [F,L]
+RewriteRule ^vendor/ - [F,L]
+
+# =====================================================
+# FICHIERS & DOSSIERS EXISTANTS
+# =====================================================
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# =====================================================
+# EXCLUSIONS
+# =====================================================
+RewriteRule ^admin(/.*)?$ - [L]
+RewriteRule ^api(/.*)?$ - [L]
+RewriteRule ^assets(/.*)?$ - [L]
+RewriteRule ^uploads(/.*)?$ - [L]
+RewriteRule ^front/assets(/.*)?$ - [L]
+
+# =====================================================
+# PAGE D'ACCUEIL
+# =====================================================
+RewriteRule ^$ /front/page.php [L,QSA]
+
+# =====================================================
+# BLOG → front/page.php (gere listing + articles)
+# =====================================================
+RewriteRule ^blog(/.*)?$ /front/page.php [QSA,L]
+
+# =====================================================
+# PAGES DE CAPTURE
+# =====================================================
+RewriteRule ^capture/?$ /front/capture/index.php [QSA,L]
+RewriteRule ^capture/([a-z0-9-]+)/?$ /front/capture/index.php?slug=$1 [QSA,L]
+
+# =====================================================
+# CATCH-ALL → BUILDER / CMS
+# =====================================================
+RewriteCond %{REQUEST_URI} !^/front/
+RewriteCond %{REQUEST_URI} !^/(admin|api|config|includes|uploads|assets|logs|vendor|cache|core|setup|tmp)
+RewriteRule ^(.+)$ /front/page.php [L,QSA]
+
+# =====================================================
+# PERFORMANCE & CACHE
+# =====================================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/x-javascript "access plus 1 week"
+    ExpiresByType font/woff2 "access plus 1 month"
+    ExpiresByType font/woff "access plus 1 month"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE application/json application/xml
+</IfModule>
+
+# =====================================================
+# ERREURS PERSONNALISEES
+# =====================================================
+ErrorDocument 404 /front/404.php
+ErrorDocument 500 /front/500.php
